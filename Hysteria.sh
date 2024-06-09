@@ -31,7 +31,8 @@ esac
 echo "请选择一个选项:"
 echo "1) 安装 Hysteria2"
 echo "2) 卸载 Hysteria2"
-read -p "输入选项 (1 或 2): " OPTION
+echo "3) 读取配置"
+read -p "输入选项 (1、2 或 3): " OPTION
 
 if [ "$OPTION" == "1" ]; then
   # 安装必要的软件包
@@ -88,7 +89,7 @@ EOF
   type: hysteria2
   server: $HOST_IP
   port: $RANDOM_PORT
-  password: $RANDOM_PSK
+  password: "$RANDOM_PSK"
   alpn:
     - h3
   sni: www.bing.com
@@ -104,6 +105,41 @@ elif [ "$OPTION" == "2" ]; then
   rm -rf /etc/hysteria
   bash <(curl -fsSL https://get.hy2.sh/) --remove
   echo "Hysteria2 已卸载"
+  
+elif [ "$OPTION" == "3" ]; then
+  # 读取现有配置文件
+  if [ -f /etc/hysteria/config.yaml ]; then
+    CONFIG_CONTENT=$(cat /etc/hysteria/config.yaml)
+    echo "现有配置文件内容如下:"
+    echo "$CONFIG_CONTENT"
+
+    # 获取本机IP地址
+    HOST_IP=$(curl -s http://checkip.amazonaws.com)
+
+    # 获取IP所在国家
+    IP_COUNTRY=$(curl -s http://ipinfo.io/$HOST_IP/country)
+
+    # 从配置文件中提取端口和密码
+    RANDOM_PORT=$(grep 'listen:' /etc/hysteria/config.yaml | awk '{print $2}' | cut -d':' -f2)
+    RANDOM_PSK=$(grep 'password:' /etc/hysteria/config.yaml | awk '{print $2}' | tr -d '"')
+
+    echo "$IP_COUNTRY = hysteria2, $HOST_IP, $RANDOM_PORT, password = $RANDOM_PSK, skip-cert-verify=true, sni=www.bing.com"
+    cat << EOF
+- name: $IP_COUNTRY
+  type: hysteria2
+  server: $HOST_IP
+  port: $RANDOM_PORT
+  password: "$RANDOM_PSK"
+  alpn:
+    - h3
+  sni: www.bing.com
+  skip-cert-verify: true
+  fast-open: true
+EOF
+  else
+    echo "配置文件不存在，请先安装 Hysteria2。"
+  fi
+
 else
   echo "无效的选项"
   exit 1
